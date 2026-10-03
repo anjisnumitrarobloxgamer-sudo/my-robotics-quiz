@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Quiz Results</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }
+        .score-box { background: #d4edda; color: #155724; padding: 25px; border-radius: 8px; margin-bottom: 20px; }
+        a { display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Quiz Completed!</h1>
+    <div class="score-box">
+        <h2>Your Total Score: {{ score }} / {{ total }}</h2>
+    </div>
+    <a href="/">Try Today's Quiz Again</a>
+</body>
+</html>

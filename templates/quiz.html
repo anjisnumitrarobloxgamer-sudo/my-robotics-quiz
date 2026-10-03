@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Quiz Website</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 500px; margin: 5px auto; padding: 20px; background-color: #f0f2f5; }
+        h1 { text-align: center; color: #333; }
+        
+        /* 1. THIS STYLES THE TIMER BOX TO BE VISIBLE AT THE TOP RIGHT CORNER */
+        .timer-container { 
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            background-color: #ffc107; /* Bright yellow box so users notice it immediately */
+            color: #000000; 
+            padding: 12px 20px; 
+            font-size: 20px; 
+            font-weight: bold; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            z-index: 1000; /* Keeps the timer floating above the quiz text while scrolling */
+        }
+        
+        .quiz-card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 25px; }
+        .option-label { display: block; margin: 10px 0; cursor: pointer; }
+        button { width: 100%; background: #007bff; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+
+    <!-- 2. THIS SHOWS THE ACTUAL LIVE TIMER BLOCK ON THE SCREEN -->
+    <div class="timer-container">
+        ⏰ Time Left: <span id="time-display">30:00</span>
+    </div>
+
+    <h1>Today's Robotics & AI Quiz</h1>
+    
+    <!-- We added an id="quiz-form" so JavaScript can find the form and submit it automatically -->
+    <form id="quiz-form" action="/submit" method="POST">
+        {% for q in quiz %}
+        <div class="quiz-card">
+            <p><strong>Q{{ loop.index }}: {{ q.question }}</strong></p>
+            {% for option in q.options %}
+            <label class="option-label">
+                <input type="radio" name="{{ q.id }}" value="{{ option }}" required> {{ option }}
+            </label>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        <button type="submit">Submit My Quiz</button>
+    </form>
+
+    <!-- 3. THIS JAVASCRIPT LOGIC TICKS DOWN THE CLOCK EVERY SECOND -->
+    <script>
+        // 30 minutes * 60 seconds = 1800 total seconds
+        let remainingSeconds = 30 * 60; 
+        
+        const displayElement = document.getElementById('time-display');
+        const formElement = document.getElementById('quiz-form');
+
+        // This built-in function triggers exactly once every 1000 milliseconds (1 second)
+        const countdownTimer = setInterval(function() {
+            let displayMinutes = Math.floor(remainingSeconds / 60);
+            let displaySeconds = remainingSeconds % 60;
+
+            // Adds a leading '0' if seconds or minutes fall into single digits (e.g., "09" instead of "9")
+            if (displaySeconds < 10) displaySeconds = '0' + displaySeconds;
+            if (displayMinutes < 10) displayMinutes = '0' + displayMinutes;
+
+            // Change the visible text inside our HTML container block
+            displayElement.textContent = displayMinutes + ":" + displaySeconds;
+
+            // 4. IF ONLY 1 MINUTE REMAINS, TURN THE TIMER RED AS A DANGER WARNING
+            if (remainingSeconds <= 60) {
+                document.querySelector('.timer-container').style.backgroundColor = '#dc3545';
+                document.querySelector('.timer-container').style.color = '#ffffff';
+            }
+
+            // 5. WHAT HAPPENS WHEN THE TIMER HITS ZERO
+            if (remainingSeconds <= 0) {
+                clearInterval(countdownTimer); // Stop the clock from running into negative numbers
+                alert("Time is completely up! Your answers are being submitted automatically.");
+                
+                // Remove the "required" validation rule so the site accepts empty/half-finished answers
+                const allRequiredInputs = formElement.querySelectorAll('[required]');
+                allRequiredInputs.forEach(input => input.removeAttribute('required'));
+                
+                formElement.submit(); // Force the webpage to press the submit button automatically
+            }
+
+            remainingSeconds--; // Subtract 1 second from our pool
+        }, 1000);
+    </script>
+</body>
+</html>
