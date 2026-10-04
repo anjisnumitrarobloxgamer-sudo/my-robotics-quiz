@@ -2,18 +2,101 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Quiz Results</title>
+    <title>Quiz Results & Review</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }
-        .score-box { background: #d4edda; color: #155724; padding: 25px; border-radius: 8px; margin-bottom: 20px; }
-        a { display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; }
+        body { font-family: Arial, sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; background-color: #f0f2f5; }
+        h1, h2 { text-align: center; color: #333; }
+        
+        .score-box { 
+            background: #d4edda; 
+            color: #155724; 
+            padding: 25px; 
+            border-radius: 8px; 
+            margin-bottom: 30px; 
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        
+        .review-card { 
+            background: white; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
+            border-left: 5px solid #ccc;
+        }
+        
+        /* Dynamic border colors based on right or wrong status */
+        .correct-card { border-left-color: #28a745; }
+        .wrong-card { border-left-color: #dc3545; }
+        
+        .status-badge { font-weight: bold; font-size: 14px; float: right; padding: 3px 8px; border-radius: 4px; }
+        .status-correct { color: #28a745; background: #e8f5e9; }
+        .status-wrong { color: #dc3545; background: #ffebee; }
+        
+        .ans-line { margin: 8px 0; font-size: 15px; }
+        .text-success { color: #28a745; font-weight: bold; }
+        .text-danger { color: #dc3545; font-weight: bold; }
+        
+        .btn-retry { 
+            display: block; 
+            text-align: center; 
+            background: #007bff; 
+            color: white; 
+            text-decoration: none; 
+            padding: 12px; 
+            border-radius: 5px; 
+            font-size: 16px; 
+            font-weight: bold; 
+            margin-top: 25px; 
+        }
+        .btn-retry:hover { background: #0056b3; }
     </style>
 </head>
 <body>
+
     <h1>Quiz Completed!</h1>
+    
     <div class="score-box">
         <h2>Your Total Score: {{ score }} / {{ total }}</h2>
     </div>
-    <a href="/">Try Today's Quiz Again</a>
+    
+    <h2>Review Your Answers</h2>
+    
+    <!-- Loop through each question to print the verification cards -->
+    {% for q in quiz %}
+        <!-- Identify if the user's answer matches the correct one to swap styling colors -->
+        {% set is_correct = (answers[q.id] == q.correct) %}
+        
+        <div class="review-card {% if is_correct %}correct-card{% else %}wrong-card{% endif %}">
+            
+            <!-- Status Text Badges with Emojis -->
+            {% if is_correct %}
+                <span class="status-badge status-correct">✅ Correct</span>
+            {% else %}
+                <span class="status-badge status-wrong">❌ Incorrect</span>
+            {% endif %}
+            
+            <p><strong>Q{{ loop.index }}: {{ q.question }}</strong></p>
+            
+            <div class="ans-line">
+                Your Answer: 
+                <span class="{% if is_correct %}text-success{% else %}text-danger{% endif %}">
+                    {{ answers[q.id] if answers[q.id] else "Not Attempted" }}
+                </span>
+            </div>
+            
+            <!-- If they got it wrong, print a helpful prompt showing the actual right choice -->
+            {% if not is_correct %}
+            <div class="ans-line">
+                Correct Option: <span class="text-success">{{ q.correct }}</span>
+            </div>
+            {% endif %}
+            
+        </div>
+    {% endfor %}
+    
+    <a href="/" class="btn-retry">Try Today's Quiz Again</a>
+
 </body>
 </html>
