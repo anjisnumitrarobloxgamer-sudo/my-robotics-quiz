@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, redirect, url_for, session
 app = Flask(__name__)
 app.secret_key = "master_all_in_one_secret_key_2026_v2"
 
-# Persistent storage: use /data when available (for hosts such as Render), otherwise local files.
+# Persistent files: use /data when deployed on a platform that provides it.
 if os.path.exists("/data"):
     DB_FILE = "/data/quiz_platform.db"
     QUESTIONS_FILE = "/data/custom_questions.json"
@@ -17,12 +17,15 @@ else:
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "robotics2026"
 
+
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
 
+
 def init_db():
+    """Create the user table if it does not already exist."""
     conn = get_db_connection()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -34,6 +37,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
 
 init_db()
 
@@ -80,8 +84,6 @@ DEFAULT_QUESTIONS = {
         {"id": 16, "question": "What process occurs when unstable atomic nuclei lose energy by emitting ionizing particles?", "options": ["Radioactive Decay", "Nuclear Fusion", "Chemical Synthesis", "Ionization"], "correct": "Radioactive Decay"},
         {"id": 17, "question": "Which planet is the hottest in our Solar System due to a dense, runaway greenhouse gas atmosphere?", "options": ["Venus", "Mercury", "Mars", "Jupiter"], "correct": "Venus"},
         {"id": 18, "question": "What values represent absolute neutral parameters on standard logarithmic pH scaling arrays?", "options": ["7", "0", "14", "5"], "correct": "7"},
-
-
 {"id": 19, "question": "What force opposes the relative motion of solid surfaces sliding against one another?", "options": ["Friction", "Inertia", "Tension", "Elasticity"], "correct": "Friction"}
 ],
 "math": [
@@ -154,206 +156,266 @@ DEFAULT_QUESTIONS = {
 }
 
 def load_all_questions():
-    """Load the default question library and merge saved custom questions."""
+    """Load default questions and append custom questions saved by the Admin Panel."""
     questions = json.loads(json.dumps(DEFAULT_QUESTIONS))
+
     if os.path.exists(QUESTIONS_FILE):
         try:
             with open(QUESTIONS_FILE, "r", encoding="utf-8") as file:
                 custom_data = json.load(file)
+
             for subject, q_list in custom_data.items():
                 if subject in questions:
                     questions[subject].extend(q_list)
                 else:
                     questions[subject] = q_list
-        except (OSError, json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, OSError, TypeError):
             pass
+
     return questions
 
+
 def save_custom_questions(custom_data):
-    """Save custom questions to persistent JSON storage."""
-    parent = os.path.dirname(QUESTIONS_FILE)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
+    """Save Admin Panel questions to JSON."""
     with open(QUESTIONS_FILE, "w", encoding="utf-8") as file:
         json.dump(custom_data, file, indent=4, ensure_ascii=False)
 
-# ---------------- APPLICATION ROUTES ----------------
 
-@app.route('/')
+# -------------------- USER ROUTES --------------------
+
+@app.route("/")
 def index():
-    if session.get('user_id'):
-        return redirect(url_for('dashboard'))
-    return redirect(url_for('signup'))
+    if session.get("user_id"):
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("signup"))
 
-@app.route('/signup', methods=['GET', 'POST'])
+
+@app.route("/signup", methods=["GET", "POST"])
 def signup():
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
 
         if not name or not email or not password:
-            return render_template('user_signup.html', error="Please fill in all fields.")
+            return render_template(
+                "user_signup.html",
+                error="Please fill in all fields."
+            )
 
         conn = get_db_connection()
         try:
             conn.execute(
-                'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+                "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
                 (name, email, password)
             )
             conn.commit()
-            return redirect(url_for('login', success="Account created successfully! Please log in."))
+            return redirect(
+                url_for("login", success="Account created successfully! Please log in.")
+            )
         except sqlite3.IntegrityError:
-            return render_template('user_signup.html', error="This email address is already registered!")
+            return render_template(
+                "user_signup.html",
+                error="This email address is already registered!"
+            )
         finally:
             conn.close()
 
-    return render_template('user_signup.html')
+    return render_template("user_signup.html")
 
-@app.route('/login', methods=['GET', 'POST'])
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    success_msg = request.args.get('success')
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        password = request.form.get('password', '')
+    success_msg = request.args.get("success")
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
 
         conn = get_db_connection()
-        try:
-            user = conn.execute(
-                'SELECT * FROM users WHERE email = ? AND password = ?',
-                (email, password)
-            ).fetchone()
-        finally:
-            conn.close()
+        user = conn.execute(
+            "SELECT * FROM users WHERE email = ? AND password = ?",
+            (email, password)
+        ).fetchone()
+        conn.close()
 
         if user:
-            session['user_id'] = user['id']
-            session['user_name'] = user['name']
-            return redirect(url_for('dashboard'))
+            session["user_id"] = user["id"]
+            session["user_name"] = user["name"]
+            return redirect(url_for("dashboard"))
 
-        return render_template('user_login.html', error="Incorrect email or password matching credentials.")
+        return render_template(
+            "user_login.html",
+            error="Incorrect email or password matching credentials."
+        )
 
-    return render_template('user_login.html', success=success_msg)
+    return render_template("user_login.html", success=success_msg)
 
-@app.route('/dashboard')
+
+@app.route("/dashboard")
 def dashboard():
-    if not session.get('user_id'):
-        return redirect(url_for('login'))
-    all_q = load_all_questions()
-    return render_template('dashboard.html', name=session['user_name'], subjects=all_q.keys())
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
 
-@app.route('/quiz/<subject>')
+    all_q = load_all_questions()
+    return render_template(
+        "dashboard.html",
+        name=session["user_name"],
+        subjects=all_q.keys()
+    )
+
+
+# -------------------- QUIZ ROUTES --------------------
+
+# IMPORTANT:
+# The subject is part of the URL. This fixes the "Not Found" error
+# that happened after submitting a quiz.
+@app.route("/quiz/<subject>")
+@app.route("/quiz/<subject>/")
 def quiz(subject):
-    if not session.get('user_id'):
-        return redirect(url_for('login'))
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
 
     all_q = load_all_questions()
+
     if subject not in all_q:
-        return redirect(url_for('dashboard'))
+        return redirect(url_for("dashboard"))
+
+    # Store the active subject in the session as an extra safety measure.
+    session["quiz_subject"] = subject
 
     return render_template(
-        'quiz.html',
+        "quiz.html",
         quiz=all_q[subject],
         subject_name=subject
     )
 
-@app.route('/submit', methods=['POST'])
-@app.route('/submit/', methods=['POST'])
-def submit():
-    if not session.get('user_id'):
-        return redirect(url_for('login'))
 
-    subject = request.form.get('subject', '').strip()
+@app.route("/submit/<subject>", methods=["POST"])
+@app.route("/submit/<subject>/", methods=["POST"])
+def submit(subject):
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
     all_q = load_all_questions()
-    questions = all_q.get(subject, [])
 
-    if not questions:
-        return redirect(url_for('dashboard'))
+    if subject not in all_q:
+        return redirect(url_for("dashboard"))
 
+    questions = all_q[subject]
     score = 0
-    total = len(questions)
     user_answers = {}
 
     for item in questions:
-        question_id = str(item['id'])
+        question_id = str(item["id"])
         selected_option = request.form.get(question_id)
-        user_answers[item['id']] = selected_option
-        if selected_option == item['correct']:
+
+        user_answers[item["id"]] = selected_option
+
+        if selected_option == item["correct"]:
             score += 1
 
     return render_template(
-        'result.html',
+        "result.html",
         score=score,
-        total=total,
+        total=len(questions),
         quiz=questions,
         answers=user_answers,
         subject_name=subject
     )
 
-# ---------------- OWNER / ADMIN PORTAL ----------------
 
-@app.route('/admin/login', methods=['GET', 'POST'])
+# Compatibility route:
+# If an older quiz.html still submits to /submit, use the subject stored
+# when the quiz was opened instead of defaulting incorrectly to robotics_ai.
+@app.route("/submit", methods=["POST"])
+@app.route("/submit/", methods=["POST"])
+def submit_legacy():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    subject = session.get("quiz_subject")
+
+    if not subject:
+        subject = request.form.get("subject")
+
+    if not subject:
+        return redirect(url_for("dashboard"))
+
+    return submit(subject)
+
+
+# -------------------- ADMIN PANEL --------------------
+
+@app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
-    if session.get('admin_logged_in'):
-        return redirect(url_for('admin_dashboard'))
+    if session.get("admin_logged_in"):
+        return redirect(url_for("admin_dashboard"))
 
-    if request.method == 'POST':
-        username = request.form.get('username', '')
-        password = request.form.get('password', '')
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
 
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            session['admin_logged_in'] = True
-            return redirect(url_for('admin_dashboard'))
+            session["admin_logged_in"] = True
+            return redirect(url_for("admin_dashboard"))
 
-        return render_template('login.html', error="Invalid Owner Credentials!")
+        return render_template(
+            "login.html",
+            error="Invalid Owner Credentials!"
+        )
 
-    return render_template('login.html')
+    return render_template("login.html")
 
-@app.route('/admin/dashboard')
+
+@app.route("/admin/dashboard")
 def admin_dashboard():
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin_login'))
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_login"))
 
     all_q = load_all_questions()
-    return render_template('admin.html', quiz=all_q)
+    return render_template("admin.html", quiz=all_q)
 
-@app.route('/admin/add', methods=['POST'])
+
+@app.route("/admin/add", methods=["POST"])
 def add_question():
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin_login'))
+    if not session.get("admin_logged_in"):
+        return redirect(url_for("admin_login"))
 
-    subject = request.form.get('subject', '').strip()
-    question = request.form.get('question', '').strip()
-    option1 = request.form.get('option1', '').strip()
-    option2 = request.form.get('option2', '').strip()
-    option3 = request.form.get('option3', '').strip()
-    option4 = request.form.get('option4', '').strip()
-    correct = request.form.get('correct', '').strip()
+    subject = request.form.get("subject", "").strip()
 
-    if not subject or not question or not all([option1, option2, option3, option4]) or not correct:
-        return redirect(url_for('admin_dashboard'))
-
-    options = [option1, option2, option3, option4]
-    if correct not in options:
-        return redirect(url_for('admin_dashboard'))
+    if not subject:
+        return redirect(url_for("admin_dashboard"))
 
     all_q = load_all_questions()
     existing_list = all_q.get(subject, [])
-    next_id = max((q.get('id', -1) for q in existing_list), default=-1) + 1
+
+    ids = [
+        q.get("id", -1)
+        for q in existing_list
+        if isinstance(q, dict) and isinstance(q.get("id", -1), int)
+    ]
+    next_id = max(ids) + 1 if ids else 0
 
     new_q = {
-        'id': next_id,
-        'question': question,
-        'options': options,
-        'correct': correct
+        "id": next_id,
+        "question": request.form.get("question", "").strip(),
+        "options": [
+            request.form.get("option1", "").strip(),
+            request.form.get("option2", "").strip(),
+            request.form.get("option3", "").strip(),
+            request.form.get("option4", "").strip()
+        ],
+        "correct": request.form.get("correct", "").strip()
     }
 
     custom_data = {}
+
     if os.path.exists(QUESTIONS_FILE):
         try:
-            with open(QUESTIONS_FILE, 'r', encoding='utf-8') as file:
+            with open(QUESTIONS_FILE, "r", encoding="utf-8") as file:
                 custom_data = json.load(file)
-        except (OSError, json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, OSError):
             custom_data = {}
 
     if subject not in custom_data:
@@ -361,21 +423,25 @@ def add_question():
 
     custom_data[subject].append(new_q)
     save_custom_questions(custom_data)
-    return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/logout')
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/logout")
 def admin_logout():
-    session.pop('admin_logged_in', None)
-    return redirect(url_for('admin_login'))
+    session.pop("admin_logged_in", None)
+    return redirect(url_for("admin_login"))
 
-@app.route('/logout')
+
+@app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for('index'))
+    return redirect(url_for("index"))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app.run(
         debug=True,
-        host='0.0.0.0',
-        port=int(os.environ.get('PORT', 5000))
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000))
     )
