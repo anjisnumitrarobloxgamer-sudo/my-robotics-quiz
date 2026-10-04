@@ -1,16 +1,21 @@
 import os
+import json
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session
 
 app = Flask(__name__)
-# Secret key required to keep user login sessions secure
-app.secret_key = "super_secure_5_subjects_key_2026_final"
+app.secret_key = "master_all_in_one_secret_key_2026_v2"
 
-# Determine path for the persistent SQLite Database file on Render
+# Persistent storage: use /data when available (for hosts such as Render), otherwise local files.
 if os.path.exists("/data"):
     DB_FILE = "/data/quiz_platform.db"
+    QUESTIONS_FILE = "/data/custom_questions.json"
 else:
     DB_FILE = "quiz_platform.db"
+    QUESTIONS_FILE = "custom_questions.json"
+
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "robotics2026"
 
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -18,24 +23,21 @@ def get_db_connection():
     return conn
 
 def init_db():
-    """Creates the secure user registration tracking table inside SQLite."""
     conn = get_db_connection()
-    conn.execute('''
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL
         )
-    ''')
+    """)
     conn.commit()
     conn.close()
 
-# Initialize the database file right away
 init_db()
 
-# COMPREHENSIVE 5-SUBJECT COURSE LIBRARY (EXACTLY 20 HARD QUESTIONS EACH)
-SUBJECT_QUIZZES = {
+DEFAULT_QUESTIONS = {
     "cricket": [
         {"id": 0, "question": "Who scored the first-ever double century in One Day International (ODI) cricket history?", "options": ["Sachin Tendulkar", "Virender Sehwag", "Rohit Sharma", "Chris Gayle"], "correct": "Sachin Tendulkar"},
         {"id": 1, "question": "What is the standard weight range of a men's professional cricket ball?", "options": ["4.75 to 5.25 ounces", "5.5 to 5.75 ounces", "5.0 to 5.5 ounces", "5.75 to 6.25 ounces"], "correct": "5.5 to 5.75 ounces"},
@@ -78,11 +80,10 @@ SUBJECT_QUIZZES = {
         {"id": 16, "question": "What process occurs when unstable atomic nuclei lose energy by emitting ionizing particles?", "options": ["Radioactive Decay", "Nuclear Fusion", "Chemical Synthesis", "Ionization"], "correct": "Radioactive Decay"},
         {"id": 17, "question": "Which planet is the hottest in our Solar System due to a dense, runaway greenhouse gas atmosphere?", "options": ["Venus", "Mercury", "Mars", "Jupiter"], "correct": "Venus"},
         {"id": 18, "question": "What values represent absolute neutral parameters on standard logarithmic pH scaling arrays?", "options": ["7", "0", "14", "5"], "correct": "7"},
-        {"id": 19, "question": "What force opposes the relative motion of solid surfaces sliding against one another?", "options": ["Friction", "Inertia", "Tension", "Elasticity"], "correct": "Friction"}
-    ],
 
 
-
+{"id": 19, "question": "What force opposes the relative motion of solid surfaces sliding against one another?", "options": ["Friction", "Inertia", "Tension", "Elasticity"], "correct": "Friction"}
+],
 "math": [
 {"id": 0, "question": "What is the numerical value of the mathematical constant pi rounded to four decimal places?", "options": ["3.1416", "3.1412", "3.1418", "3.1420"], "correct": "3.1416"},
 {"id": 1, "question": "What is the total sum of all interior angles inside a standard geometric hexagon shape?", "options": ["720 degrees", "540 degrees", "360 degrees", "900 degrees"], "correct": "720 degrees"},
@@ -128,8 +129,8 @@ SUBJECT_QUIZZES = {
 {"id": 19, "question": "What is the main objective of unsupervised machine learning clustering algorithms?", "options": ["To group unlabeled data by hidden patterns", "To predict continuous target variables", "To classify text onto labels", "To secure server databases"], "correct": "To group unlabeled data by hidden patterns"}
 ],
 "java": [
-{"id": 0, "question": "What memory area handles object allocations in Java?", "options": ["Heap Space", "Stack Memory", "Method Area", "Register Cache"], "correct": "Heap Space"},
 
+{"id": 0, "question": "What memory area handles object allocations in Java?", "options": ["Heap Space", "Stack Memory", "Method Area", "Register Cache"], "correct": "Heap Space"},
 {"id": 1, "question": "Which keyword prevents a class from being inherited or sub-classed by another class?", "options": ["final", "static", "abstract", "private"], "correct": "final"},
 {"id": 2, "question": "Which interface must a class implement to allow its instances to be sorted using Collections.sort()?", "options": ["Comparable", "Comparator", "Serializable", "Cloneable"], "correct": "Comparable"},
 {"id": 3, "question": "What exception is thrown when a program tries to access an object reference that hasn't been initialized?", "options": ["NullPointerException", "ArrayIndexOutOfBoundsException", "IllegalArgumentException", "IOException"], "correct": "NullPointerException"},
@@ -152,125 +153,229 @@ SUBJECT_QUIZZES = {
 ]
 }
 
-@app.route("/")
+def load_all_questions():
+    """Load the default question library and merge saved custom questions."""
+    questions = json.loads(json.dumps(DEFAULT_QUESTIONS))
+    if os.path.exists(QUESTIONS_FILE):
+        try:
+            with open(QUESTIONS_FILE, "r", encoding="utf-8") as file:
+                custom_data = json.load(file)
+            for subject, q_list in custom_data.items():
+                if subject in questions:
+                    questions[subject].extend(q_list)
+                else:
+                    questions[subject] = q_list
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
+    return questions
+
+def save_custom_questions(custom_data):
+    """Save custom questions to persistent JSON storage."""
+    parent = os.path.dirname(QUESTIONS_FILE)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(QUESTIONS_FILE, "w", encoding="utf-8") as file:
+        json.dump(custom_data, file, indent=4, ensure_ascii=False)
+
+# ---------------- APPLICATION ROUTES ----------------
+
+@app.route('/')
 def index():
-    if session.get("user_id"):
-        return redirect(url_for("dashboard"))
-    return render_template("portal_landing.html")
+    if session.get('user_id'):
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('signup'))
 
-
-@app.route("/signup", methods=["GET", "POST"])
+@app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
 
         if not name or not email or not password:
-            return render_template(
-                "user_signup.html",
-                error="Please fill in all fields."
-            )
+            return render_template('user_signup.html', error="Please fill in all fields.")
 
         conn = get_db_connection()
         try:
             conn.execute(
-                "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+                'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
                 (name, email, password)
             )
             conn.commit()
+            return redirect(url_for('login', success="Account created successfully! Please log in."))
         except sqlite3.IntegrityError:
-            conn.close()
-            return render_template(
-                "user_signup.html",
-                error="This email address is already registered!"
-            )
+            return render_template('user_signup.html', error="This email address is already registered!")
         finally:
             conn.close()
 
-        return redirect(
-            url_for("login", success="Account created successfully! Please log in.")
-        )
+    return render_template('user_signup.html')
 
-    return render_template("user_signup.html")
-
-
-@app.route("/login", methods=["GET", "POST"])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    success_msg = request.args.get("success")
-
-    if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
+    success_msg = request.args.get('success')
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
 
         conn = get_db_connection()
-        user = conn.execute(
-            "SELECT * FROM users WHERE email = ? AND password = ?",
-            (email, password)
-        ).fetchone()
-        conn.close()
+        try:
+            user = conn.execute(
+                'SELECT * FROM users WHERE email = ? AND password = ?',
+                (email, password)
+            ).fetchone()
+        finally:
+            conn.close()
 
         if user:
-            session["user_id"] = user["id"]
-            session["user_name"] = user["name"]
-            return redirect(url_for("dashboard"))
+            session['user_id'] = user['id']
+            session['user_name'] = user['name']
+            return redirect(url_for('dashboard'))
 
-        return render_template(
-            "user_login.html",
-            error="Incorrect email or password."
-        )
+        return render_template('user_login.html', error="Incorrect email or password matching credentials.")
 
-    return render_template("user_login.html", success=success_msg)
+    return render_template('user_login.html', success=success_msg)
 
-
-@app.route("/dashboard")
+@app.route('/dashboard')
 def dashboard():
-    if not session.get("user_id"):
-        return redirect(url_for("login"))
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+    all_q = load_all_questions()
+    return render_template('dashboard.html', name=session['user_name'], subjects=all_q.keys())
 
-    return render_template(
-        "dashboard.html",
-        name=session["user_name"],
-        subjects=SUBJECT_QUIZZES.keys()
-    )
-
-
-@app.route("/quiz/<subject>")
+@app.route('/quiz/<subject>')
 def quiz(subject):
-    if not session.get("user_id"):
-        return redirect(url_for("login"))
-
-    if subject not in SUBJECT_QUIZZES:
-        return redirect(url_for("dashboard"))
-
-    return render_template(
-        "quiz.html",
-        quiz=SUBJECT_QUIZZES[subject],
-        subject_name=subject
-    )
-
-
-# SAFETY CATCH: Handles old browser templates trying to submit to /submit
-@app.route('/submit', methods=['POST'])
-@app.route('/submit/<subject>', methods=['POST'])
-def submit(subject=None):
     if not session.get('user_id'):
         return redirect(url_for('login'))
 
-    # Fallback to robotics_ai if the browser's cached form didn't pass a subject name
-    if not subject:
-        subject = "robotics_ai"
+    all_q = load_all_questions()
+    if subject not in all_q:
+        return redirect(url_for('dashboard'))
 
-    questions = SUBJECT_QUIZZES.get(subject, [])
+    return render_template(
+        'quiz.html',
+        quiz=all_q[subject],
+        subject_name=subject
+    )
+
+@app.route('/submit', methods=['POST'])
+@app.route('/submit/', methods=['POST'])
+def submit():
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+
+    subject = request.form.get('subject', '').strip()
+    all_q = load_all_questions()
+    questions = all_q.get(subject, [])
+
+    if not questions:
+        return redirect(url_for('dashboard'))
+
     score = 0
     total = len(questions)
     user_answers = {}
 
     for item in questions:
-        question_id = str(item["id"])
+        question_id = str(item['id'])
         selected_option = request.form.get(question_id)
-        user_answers[item["id"]] = selected_option
-        if selected_option == item["correct"]:
+        user_answers[item['id']] = selected_option
+        if selected_option == item['correct']:
             score += 1
 
-    return render_template('result.html', score=score, total=total, quiz=questions, answers=user_answers)
+    return render_template(
+        'result.html',
+        score=score,
+        total=total,
+        quiz=questions,
+        answers=user_answers,
+        subject_name=subject
+    )
+
+# ---------------- OWNER / ADMIN PORTAL ----------------
+
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if session.get('admin_logged_in'):
+        return redirect(url_for('admin_dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            return redirect(url_for('admin_dashboard'))
+
+        return render_template('login.html', error="Invalid Owner Credentials!")
+
+    return render_template('login.html')
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    all_q = load_all_questions()
+    return render_template('admin.html', quiz=all_q)
+
+@app.route('/admin/add', methods=['POST'])
+def add_question():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    subject = request.form.get('subject', '').strip()
+    question = request.form.get('question', '').strip()
+    option1 = request.form.get('option1', '').strip()
+    option2 = request.form.get('option2', '').strip()
+    option3 = request.form.get('option3', '').strip()
+    option4 = request.form.get('option4', '').strip()
+    correct = request.form.get('correct', '').strip()
+
+    if not subject or not question or not all([option1, option2, option3, option4]) or not correct:
+        return redirect(url_for('admin_dashboard'))
+
+    options = [option1, option2, option3, option4]
+    if correct not in options:
+        return redirect(url_for('admin_dashboard'))
+
+    all_q = load_all_questions()
+    existing_list = all_q.get(subject, [])
+    next_id = max((q.get('id', -1) for q in existing_list), default=-1) + 1
+
+    new_q = {
+        'id': next_id,
+        'question': question,
+        'options': options,
+        'correct': correct
+    }
+
+    custom_data = {}
+    if os.path.exists(QUESTIONS_FILE):
+        try:
+            with open(QUESTIONS_FILE, 'r', encoding='utf-8') as file:
+                custom_data = json.load(file)
+        except (OSError, json.JSONDecodeError, TypeError):
+            custom_data = {}
+
+    if subject not in custom_data:
+        custom_data[subject] = []
+
+    custom_data[subject].append(new_q)
+    save_custom_questions(custom_data)
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    return redirect(url_for('admin_login'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
+
+if __name__ == '__main__':
+    app.run(
+        debug=True,
+        host='0.0.0.0',
+        port=int(os.environ.get('PORT', 5000))
+    )
