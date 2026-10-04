@@ -7,37 +7,72 @@
         body { font-family: Arial, sans-serif; max-width: 500px; margin: 5px auto; padding: 20px; background-color: #f0f2f5; }
         h1 { text-align: center; color: #333; }
         
-        /* 1. THIS STYLES THE TIMER BOX TO BE VISIBLE AT THE TOP RIGHT CORNER */
+        /* Floating Sticky Timer Box (Hidden at start) */
         .timer-container { 
             position: fixed; 
             top: 20px; 
             right: 20px; 
-            background-color: #ffc107; /* Bright yellow box so users notice it immediately */
+            background-color: #ffc107; 
             color: #000000; 
             padding: 12px 20px; 
             font-size: 20px; 
             font-weight: bold; 
             border-radius: 8px; 
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            z-index: 1000; /* Keeps the timer floating above the quiz text while scrolling */
+            z-index: 1000;
+            display: none; /* HIDES TIMER ON START SCREEN */
         }
+        
+        /* 1. START LOBBY CARD DESIGN */
+        .start-card {
+            background: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-top: 50px;
+        }
+        .start-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: 0.2s;
+        }
+        .start-btn:hover { background: #218838; }
+
+        /* Hides the quiz questions form initially */
+        #quiz-form { display: none; }
         
         .quiz-card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 25px; }
         .option-label { display: block; margin: 10px 0; cursor: pointer; }
-        button { width: 100%; background: #007bff; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #0056b3; }
+        button.submit-btn { width: 100%; background: #007bff; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        button.submit-btn:hover { background: #0056b3; }
     </style>
 </head>
 <body>
 
-    <!-- 2. THIS SHOWS THE ACTUAL LIVE TIMER BLOCK ON THE SCREEN -->
-    <div class="timer-container">
+    <!-- TIMER SCREEN HOOK (Hidden at first) -->
+    <div class="timer-container" id="timer-box">
         ⏰ Time Left: <span id="time-display">30:00</span>
     </div>
 
-    <h1>Today's Robotics & AI Quiz</h1>
+    <!-- 2. THE NEW WELCOME START SCREEN LAYOUT -->
+    <div id="start-screen" class="start-card">
+        <h2>Welcome to the Robotics & AI Challenge!</h2>
+        <p>You have exactly <strong>30 minutes</strong> to complete 20 technical questions.</p>
+        <p>The countdown clock will start as soon as you hit the button below.</p>
+        <button class="start-btn" onclick="startQuiz()">Start Quiz Now</button>
+    </div>
+
+    <h1 id="quiz-heading" style="display: none;">Today's Robotics & AI Quiz</h1>
     
-    <!-- We added an id="quiz-form" so JavaScript can find the form and submit it automatically -->
+    <!-- THE MAIN QUIZ FORM (Hidden at first) -->
     <form id="quiz-form" action="/submit" method="POST">
         {% for q in quiz %}
         <div class="quiz-card">
@@ -49,49 +84,58 @@
             {% endfor %}
         </div>
         {% endfor %}
-        <button type="submit">Submit My Quiz</button>
+        <button type="submit" class="submit-btn">Submit My Quiz</button>
     </form>
 
-    <!-- 3. THIS JAVASCRIPT LOGIC TICKS DOWN THE CLOCK EVERY SECOND -->
+    <!-- 3. JAVASCRIPT LOGIC SWITCH CONTROLLER -->
     <script>
-        // 30 minutes * 60 seconds = 1800 total seconds
         let remainingSeconds = 30 * 60; 
-        
         const displayElement = document.getElementById('time-display');
         const formElement = document.getElementById('quiz-form');
+        const timerBox = document.getElementById('timer-box');
+        const startScreen = document.getElementById('start-screen');
+        const quizHeading = document.getElementById('quiz-heading');
 
-        // This built-in function triggers exactly once every 1000 milliseconds (1 second)
-        const countdownTimer = setInterval(function() {
-            let displayMinutes = Math.floor(remainingSeconds / 60);
-            let displaySeconds = remainingSeconds % 60;
+        // This function triggers ONLY when the green button is clicked
+        function startQuiz() {
+            // Hide the introduction lobby screen
+            startScreen.style.display = 'none';
+            
+            // Unhide the quiz elements and the clock block container
+            formElement.style.display = 'block';
+            timerBox.style.display = 'block';
+            quizHeading.style.display = 'block';
+            
+            // Start the actual clock interval loop execution right now!
+            runClockEngine();
+        }
 
-            // Adds a leading '0' if seconds or minutes fall into single digits (e.g., "09" instead of "9")
-            if (displaySeconds < 10) displaySeconds = '0' + displaySeconds;
-            if (displayMinutes < 10) displayMinutes = '0' + displayMinutes;
+        function runClockEngine() {
+            const countdownTimer = setInterval(function() {
+                let displayMinutes = Math.floor(remainingSeconds / 60);
+                let displaySeconds = remainingSeconds % 60;
 
-            // Change the visible text inside our HTML container block
-            displayElement.textContent = displayMinutes + ":" + displaySeconds;
+                if (displaySeconds < 10) displaySeconds = '0' + displaySeconds;
+                if (displayMinutes < 10) displayMinutes = '0' + displayMinutes;
 
-            // 4. IF ONLY 1 MINUTE REMAINS, TURN THE TIMER RED AS A DANGER WARNING
-            if (remainingSeconds <= 60) {
-                document.querySelector('.timer-container').style.backgroundColor = '#dc3545';
-                document.querySelector('.timer-container').style.color = '#ffffff';
-            }
+                displayElement.textContent = displayMinutes + ":" + displaySeconds;
 
-            // 5. WHAT HAPPENS WHEN THE TIMER HITS ZERO
-            if (remainingSeconds <= 0) {
-                clearInterval(countdownTimer); // Stop the clock from running into negative numbers
-                alert("Time is completely up! Your answers are being submitted automatically.");
-                
-                // Remove the "required" validation rule so the site accepts empty/half-finished answers
-                const allRequiredInputs = formElement.querySelectorAll('[required]');
-                allRequiredInputs.forEach(input => input.removeAttribute('required'));
-                
-                formElement.submit(); // Force the webpage to press the submit button automatically
-            }
+                if (remainingSeconds <= 60) {
+                    document.querySelector('.timer-container').style.backgroundColor = '#dc3545';
+                    document.querySelector('.timer-container').style.color = '#ffffff';
+                }
 
-            remainingSeconds--; // Subtract 1 second from our pool
-        }, 1000);
+                if (remainingSeconds <= 0) {
+                    clearInterval(countdownTimer);
+                    alert("Time is completely up! Your answers are being submitted automatically.");
+                    const allRequiredInputs = formElement.querySelectorAll('[required]');
+                    allRequiredInputs.forEach(input => input.removeAttribute('required'));
+                    formElement.submit();
+                }
+
+                remainingSeconds--;
+            }, 1000);
+        }
     </script>
 </body>
 </html>
