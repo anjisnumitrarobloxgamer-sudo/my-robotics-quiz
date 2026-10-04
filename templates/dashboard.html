@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Student Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f0f2f5; }
+        .header { background: white; padding: 20px; border-radius: 8px; margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .logout-btn { float: right; background: #dc3545; color: white; text-decoration: none; padding: 8px 15px; border-radius: 4px; font-size: 14px; }
+        .subject-card { background: white; padding: 20px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); transition: 0.2s; }
+        .subject-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .start-btn { display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; margin-top: 10px; }
+        .subject-name { text-transform: uppercase; font-size: 18px; color: #333; margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/logout" class="logout-btn">Log Out</a>
+        <h2>Hello, {{ name }}! 👋</h2>
+        <p>Welcome to your personal student dashboard. Choose a course module area below to challenge yourself:</p>
+    </div>
+
+    <h3>Available Subject Quizzes</h3>
+    
+    {% for sub in subjects %}
+    <div class="subject-card">
+        <p class="subject-name"><strong>{{ sub.replace('_', ' & ') }} Module</strong></p>
+        <p>Challenge your operational knowledge parameters in this field category context loop.</p>
+        <a href="/quiz/{{ sub }}" class="start-btn">Launch Quiz Module</a>
+    </div>
+    {% endfor %}
+</body>
+</html>

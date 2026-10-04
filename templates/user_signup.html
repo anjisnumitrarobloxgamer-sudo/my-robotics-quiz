@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register Account</title>
+    <style>
+        body { font-family: Arial; max-width: 400px; margin: 80px auto; padding: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        input { width: 94%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #28a745; color: white; border: none; padding: 12px; font-size: 16px; cursor: pointer; border-radius: 4px; width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Student Registration</h2>
+        {% if error %} <p style="color: red;">{{ error }}</p> {% endif %}
+        <form method="POST">
+            <input type="text" name="name" placeholder="Enter Full Name" required>
+            <input type="email" name="email" placeholder="Enter Email Address" required>
+            <input type="password" name="password" placeholder="Choose a Secure Password" required>
+            <button type="submit">Register Account</button>
+        </form>
+        <p style="text-align: center;"><a href="/login">Already have an account? Sign In</a></p>
+    </div>
+</body>
+</html>
