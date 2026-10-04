@@ -250,16 +250,18 @@ def quiz(subject):
     )
 
 
-@app.route("/submit/<subject>", methods=["POST"])
-def submit(subject):
-    if not session.get("user_id"):
-        return redirect(url_for("login"))
+# SAFETY CATCH: Handles old browser templates trying to submit to /submit
+@app.route('/submit', methods=['POST'])
+@app.route('/submit/<subject>', methods=['POST'])
+def submit(subject=None):
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
 
-    questions = SUBJECT_QUIZZES.get(subject)
+    # Fallback to robotics_ai if the browser's cached form didn't pass a subject name
+    if not subject:
+        subject = "robotics_ai"
 
-    if questions is None:
-        return redirect(url_for("dashboard"))
-
+    questions = SUBJECT_QUIZZES.get(subject, [])
     score = 0
     total = len(questions)
     user_answers = {}
@@ -267,30 +269,8 @@ def submit(subject):
     for item in questions:
         question_id = str(item["id"])
         selected_option = request.form.get(question_id)
-
         user_answers[item["id"]] = selected_option
-
         if selected_option == item["correct"]:
             score += 1
 
-    return render_template(
-        "result.html",
-        score=score,
-        total=total,
-        quiz=questions,
-        answers=user_answers
-    )
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("index"))
-
-
-if __name__ == "__main__":
-    app.run(
-        debug=True,
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000))
-    )
+    return render_template('result.html', score=score, total=total, quiz=questions, answers=user_answers)
