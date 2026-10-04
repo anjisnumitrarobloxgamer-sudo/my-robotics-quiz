@@ -2,12 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Daily Quiz Website</title>
+    <title>Subject Quiz Module</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 500px; margin: 5px auto; padding: 20px; background-color: #f0f2f5; }
-        h1 { text-align: center; color: #333; }
+        h1 { text-align: center; color: #333; text-transform: uppercase; font-size: 22px; }
         
-        /* Floating Sticky Timer Box (Hidden at start) */
+        /* Floating Sticky Timer Box */
         .timer-container { 
             position: fixed; 
             top: 20px; 
@@ -20,10 +20,10 @@
             border-radius: 8px; 
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             z-index: 1000;
-            display: none; /* HIDES TIMER ON START SCREEN */
+            display: none; 
         }
         
-        /* 1. START LOBBY CARD DESIGN */
+        /* Start Lobby Card Design */
         .start-card {
             background: white;
             padding: 30px;
@@ -46,34 +46,36 @@
         }
         .start-btn:hover { background: #218838; }
 
-        /* Hides the quiz questions form initially */
+        /* Hide quiz form initially */
         #quiz-form { display: none; }
         
         .quiz-card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 25px; }
         .option-label { display: block; margin: 10px 0; cursor: pointer; }
-        button.submit-btn { width: 100%; background: #007bff; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; }
+        button.submit-btn { width: 100%; background: #007bff; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         button.submit-btn:hover { background: #0056b3; }
+        .back-link { display: block; text-align: center; margin-top: 15px; color: #007bff; text-decoration: none; }
     </style>
 </head>
 <body>
 
-    <!-- TIMER SCREEN HOOK (Hidden at first) -->
+    <!-- Timer Box -->
     <div class="timer-container" id="timer-box">
         ⏰ Time Left: <span id="time-display">30:00</span>
     </div>
 
-    <!-- 2. THE NEW WELCOME START SCREEN LAYOUT -->
+    <!-- Welcome Start Screen Layout -->
     <div id="start-screen" class="start-card">
-        <h2>Welcome to the Robotics & AI Challenge!</h2>
-        <p>You have exactly <strong>30 minutes</strong> to complete 20 technical questions.</p>
+        <h2>Welcome to the {{ subject_name.replace('_', ' & ').upper() }} Challenge!</h2>
+        <p>You have exactly <strong>30 minutes</strong> to complete all 20 advanced questions.</p>
         <p>The countdown clock will start as soon as you hit the button below.</p>
         <button class="start-btn" onclick="startQuiz()">Start Quiz Now</button>
+        <a href="/dashboard" class="back-link">Return to Dashboard</a>
     </div>
 
-    <h1 id="quiz-heading" style="display: none;">Today's Robotics & AI Quiz</h1>
+    <h1 id="quiz-heading" style="display: none;">{{ subject_name.replace('_', ' & ') }} Quiz</h1>
     
-    <!-- THE MAIN QUIZ FORM (Hidden at first) -->
-    <form id="quiz-form" action="/submit" method="POST">
+    <!-- FIX: Dynamic Routing Action Form -->
+    <form id="quiz-form" action="/submit/{{ subject_name }}" method="POST">
         {% for q in quiz %}
         <div class="quiz-card">
             <p><strong>Q{{ loop.index }}: {{ q.question }}</strong></p>
@@ -87,7 +89,6 @@
         <button type="submit" class="submit-btn">Submit My Quiz</button>
     </form>
 
-    <!-- 3. JAVASCRIPT LOGIC SWITCH CONTROLLER -->
     <script>
         let remainingSeconds = 30 * 60; 
         const displayElement = document.getElementById('time-display');
@@ -96,17 +97,11 @@
         const startScreen = document.getElementById('start-screen');
         const quizHeading = document.getElementById('quiz-heading');
 
-        // This function triggers ONLY when the green button is clicked
         function startQuiz() {
-            // Hide the introduction lobby screen
             startScreen.style.display = 'none';
-            
-            // Unhide the quiz elements and the clock block container
             formElement.style.display = 'block';
             timerBox.style.display = 'block';
             quizHeading.style.display = 'block';
-            
-            // Start the actual clock interval loop execution right now!
             runClockEngine();
         }
 
@@ -127,7 +122,7 @@
 
                 if (remainingSeconds <= 0) {
                     clearInterval(countdownTimer);
-                    alert("Time is completely up! Your answers are being submitted automatically.");
+                    alert("Time is up! Your answers are being submitted automatically.");
                     const allRequiredInputs = formElement.querySelectorAll('[required]');
                     allRequiredInputs.forEach(input => input.removeAttribute('required'));
                     formElement.submit();
